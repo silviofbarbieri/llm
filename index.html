@@ -5,7 +5,6 @@
     env.allowRemoteModels = true;
     env.allowLocalModels = false;
 
-    // Usando o modelo Qwen2.5-0.5B otimizado e rodando via WASM para máxima compatibilidade
     const MODEL_NAME = "onnx-community/Qwen2.5-0.5B-Instruct";
 
     const chat = document.getElementById("chat");
@@ -21,9 +20,7 @@
     let messages = [
       {
         role: "system",
-        content:
-          "Você é um assistente prestativo, preciso e conciso. Responda sempre em português do Brasil, " +
-          "com base estritamente em fatos, sem inventar informações ou alucinar."
+        content: "Você é um assistente prestativo, preciso e conciso. Responda sempre em português do Brasil, com base estritamente em fatos."
       }
     ];
 
@@ -34,28 +31,15 @@
 
     function addMessage(role, text) {
       if (welcome) welcome.style.display = "none";
-
       const row = document.createElement("div");
       row.className = `message ${role}`;
-
       const bubble = document.createElement("div");
       bubble.className = "bubble";
       bubble.textContent = text;
-
       row.appendChild(bubble);
       chat.appendChild(row);
       chat.scrollTop = chat.scrollHeight;
-
       return bubble;
-    }
-
-    function onReady(modelName) {
-      setStatus("Modelo pronto · WASM/CPU", "ready");
-      document.getElementById("footnote").textContent =
-        "Modelo: " + modelName + " · processamento local no navegador";
-      input.disabled = false;
-      sendBtn.disabled = false;
-      input.focus();
     }
 
     function onProgress(p) {
@@ -64,25 +48,43 @@
       }
     }
 
+    // Transformado em função disparada por clique do usuário para burlar restrições de timeout da Vercel
     async function loadModel() {
+      const loadBtn = document.getElementById("loadModelBtn");
+      if (loadBtn) loadBtn.style.display = "none";
+
       try {
-        setStatus("Carregando o modelo em modo WASM/CPU... Aguarde o download.");
+        setStatus("Iniciando download do modelo (WASM/CPU)... Aguarde.");
         
         generator = await pipeline("text-generation", MODEL_NAME, {
           device: "wasm",
           progress_callback: onProgress
         });
 
-        onReady(MODEL_NAME);
+        setStatus("Modelo pronto para uso!", "ready");
+        document.getElementById("footnote").textContent = "Modelo: " + MODEL_NAME + " · ativo";
+        input.disabled = false;
+        sendBtn.disabled = false;
+        input.focus();
       } catch (error) {
         console.error(error);
-        setStatus("Erro ao carregar o modelo: " + (error?.message || error), "error");
+        setStatus("Erro ao carregar: " + (error?.message || error), "error");
+        if (loadBtn) loadBtn.style.display = "inline-block";
       }
+    }
+
+    // Adicionamos um botão de início na tela de boas-vindas para evitar o bloqueio automático
+    if (welcome) {
+      const btnContainer = document.createElement("div");
+      btnContainer.style.marginTop = "20px";
+      btnContainer.innerHTML = `<button id="loadModelBtn" style="padding: 10px 20px; background: #172033; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600;">Carregar IA no Navegador</button>`;
+      welcome.appendChild(btnContainer);
+      
+      document.getElementById("loadModelBtn").addEventListener("click", loadModel);
     }
 
     async function generate(userText) {
       messages.push({ role: "user", content: userText });
-
       typing.style.display = "block";
       sendBtn.disabled = true;
       input.disabled = true;
@@ -113,22 +115,13 @@
           }
         }
 
-        answer = answer.trim();
-
-        if (!answer) {
-          answer = "Não consegui gerar uma resposta.";
-        }
-
+        answer = answer.trim() || "Não consegui gerar uma resposta.";
         messages.push({ role: "assistant", content: answer });
         addMessage("assistant", answer);
-
       } catch (error) {
         console.error(error);
         messages.pop();
-        addMessage(
-          "assistant",
-          "Ocorreu um erro ao gerar a resposta. Veja o Console do navegador."
-        );
+        addMessage("assistant", "Ocorreu um erro ao gerar a resposta.");
       } finally {
         typing.style.display = "none";
         sendBtn.disabled = false;
@@ -139,14 +132,11 @@
 
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
-
       const text = input.value.trim();
       if (!text || !generator) return;
-
       addMessage("user", text);
       input.value = "";
       input.style.height = "48px";
-
       await generate(text);
     });
 
@@ -163,21 +153,11 @@
     });
 
     clearBtn.addEventListener("click", () => {
-      messages = [
-        {
-          role: "system",
-          content:
-            "Você é um assistente prestativo, preciso e conciso. Responda sempre em português do Brasil, " +
-            "com base estritamente em fatos, sem inventar informações ou alucinar."
-        }
-      ];
-
+      messages = [{ role: "system", content: "Você é um assistente prestativo, preciso e conciso." }];
       chat.innerHTML = "";
       chat.appendChild(welcome);
       welcome.style.display = "block";
       input.value = "";
       input.focus();
     });
-
-    loadModel();
   </script>
