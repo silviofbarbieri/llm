@@ -14,7 +14,7 @@
       background: #f5f7fb;
       color: #172033;
       height: 100vh;
-      display: flex;
+      display: flex;'
       justify-content: center;
     }
 
@@ -242,7 +242,7 @@
         <button id="sendBtn" type="submit" disabled>Enviar</button>
       </div>
       <div class="footnote">
-        Modelo: SmolLM2-135M-Instruct · processamento local no navegador
+        Modelo: Qwen2.5-0.5B-Instruct · processamento local no navegador
       </div>
     </form>
   </main>
@@ -255,7 +255,7 @@
     env.allowRemoteModels = true;
     env.allowLocalModels = false;
 
-    const MODEL = "onnx-community/SmolLM2-135M-Instruct";
+    const MODEL = "onnx-community/Qwen2.5-0.5B-Instruct";
 
     const chat = document.getElementById("chat");
     const welcome = document.getElementById("welcome");
@@ -271,8 +271,8 @@
       {
         role: "system",
         content:
-          "You are a helpful, concise assistant. Answer clearly. " +
-          "If the user writes in Portuguese, answer in Portuguese."
+          "Você é um assistente prestativo e conciso. Responda sempre no idioma do usuário " +
+          "(por padrão, português do Brasil), de forma clara e sem repetir frases."
       }
     ];
 
@@ -328,7 +328,7 @@
         try {
           generator = await pipeline("text-generation", MODEL, {
             device: "webgpu",
-            dtype: "q4f16",
+            dtype: "q4",
             progress_callback: onProgress
           });
           return onReady("WebGPU");
@@ -341,7 +341,7 @@
         setStatus("Carregando em modo WASM/CPU...");
         generator = await pipeline("text-generation", MODEL, {
           device: "wasm",
-          dtype: "q8",
+          dtype: "int8",
           progress_callback: onProgress
         });
         onReady("WASM/CPU");
@@ -360,7 +360,8 @@
 
       try {
         const output = await generator(messages, {
-          max_new_tokens: 160,
+          max_new_tokens: 256,
+          repetition_penalty: 1.1,
           temperature: 0.7,
           top_p: 0.9,
           do_sample: true
@@ -431,8 +432,8 @@
         {
           role: "system",
           content:
-            "You are a helpful, concise assistant. Answer clearly. " +
-            "If the user writes in Portuguese, answer in Portuguese."
+            "Você é um assistente prestativo e conciso. Responda sempre no idioma do usuário " +
+            "(por padrão, português do Brasil), de forma clara e sem repetir frases."
         }
       ];
 
