@@ -14,7 +14,7 @@
       background: #f5f7fb;
       color: #172033;
       height: 100vh;
-      display: flex;'
+      display: flex;
       justify-content: center;
     }
 
@@ -241,8 +241,8 @@
         ></textarea>
         <button id="sendBtn" type="submit" disabled>Enviar</button>
       </div>
-      <div class="footnote">
-        Modelo: Qwen2.5-0.5B-Instruct · processamento local no navegador
+      <div class="footnote" id="footnote">
+        Processamento local no navegador
       </div>
     </form>
   </main>
@@ -255,7 +255,9 @@
     env.allowRemoteModels = true;
     env.allowLocalModels = false;
 
-    const MODEL = "onnx-community/Qwen2.5-0.5B-Instruct";
+    // Modelos atualizados (Qwen2.5 com 1.5B para WebGPU e 0.5B otimizado para CPU/WASM)
+    const MODEL_GPU = "onnx-community/Qwen2.5-1.5B-Instruct";   // WebGPU (Melhor inteligência e PT-BR)
+    const MODEL_CPU = "onnx-community/Qwen2.5-0.5B-Instruct";    // WASM/CPU (Leve para dispositivos limitados)
 
     const chat = document.getElementById("chat");
     const welcome = document.getElementById("welcome");
@@ -271,8 +273,8 @@
       {
         role: "system",
         content:
-          "Você é um assistente prestativo e conciso. Responda sempre no idioma do usuário " +
-          "(por padrão, português do Brasil), de forma clara e sem repetir frases."
+          "Você é um assistente prestativo, preciso e conciso. Responda sempre em português do Brasil, " +
+          "com base estritamente em fatos, sem inventar informações ou alucinar."
       }
     ];
 
@@ -308,8 +310,10 @@
       }
     }
 
-    function onReady(label) {
+    function onReady(label, modelName) {
       setStatus("Modelo pronto · " + label, "ready");
+      document.getElementById("footnote").textContent =
+        "Modelo: " + modelName + " · processamento local no navegador";
       input.disabled = false;
       sendBtn.disabled = false;
       input.focus();
@@ -326,12 +330,12 @@
 
       if (await hasWorkingWebGPU()) {
         try {
-          generator = await pipeline("text-generation", MODEL, {
+          generator = await pipeline("text-generation", MODEL_GPU, {
             device: "webgpu",
             dtype: "q4",
             progress_callback: onProgress
           });
-          return onReady("WebGPU");
+          return onReady("WebGPU", "Qwen2.5-1.5B-Instruct");
         } catch (e) {
           console.warn("WebGPU falhou, usando WASM:", e);
         }
@@ -339,12 +343,12 @@
 
       try {
         setStatus("Carregando em modo WASM/CPU...");
-        generator = await pipeline("text-generation", MODEL, {
+        generator = await pipeline("text-generation", MODEL_CPU, {
           device: "wasm",
-          dtype: "int8",
+          dtype: "q4",
           progress_callback: onProgress
         });
-        onReady("WASM/CPU");
+        onReady("WASM/CPU", "Qwen2.5-0.5B-Instruct");
       } catch (error) {
         console.error(error);
         setStatus("Erro ao carregar o modelo: " + (error?.message || error), "error");
@@ -361,9 +365,9 @@
       try {
         const output = await generator(messages, {
           max_new_tokens: 256,
-          repetition_penalty: 1.1,
-          temperature: 0.7,
-          top_p: 0.9,
+          repetition_penalty: 1.15, // Evita repetições de frases
+          temperature: 0.2,         // Reduzido drasticamente para evitar alucinações
+          top_p: 0.8,               // Amostragem mais restrita e precisa
           do_sample: true
         });
 
@@ -376,6 +380,13 @@
           answer = typeof last === "string" ? last : last?.content || "";
         } else {
           answer = String(generated || "");
+        }
+
+        if (Array.isArray(generated) && generated.length > messages.length - 1) {
+          const lastMsg = generated[generated.length - 1];
+          if (lastMsg && lastMsg.role === 'assistant') {
+            answer = lastMsg.content;
+          }
         }
 
         answer = answer.trim();
@@ -432,8 +443,8 @@
         {
           role: "system",
           content:
-            "Você é um assistente prestativo e conciso. Responda sempre no idioma do usuário " +
-            "(por padrão, português do Brasil), de forma clara e sem repetir frases."
+            "Você é um assistente prestativo, preciso e conciso. Responda sempre em português do Brasil, " +
+            "com base estritamente em fatos, sem inventar informações ou alucinar."
         }
       ];
 
